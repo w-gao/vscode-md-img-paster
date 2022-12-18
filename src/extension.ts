@@ -1,9 +1,34 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { existsSync } from 'fs';
+import { spawn } from 'child_process';
 
 
+/**
+ * Get a somewhat random string with a fixed length.
+ */
 const generateRandomString = (length: number): string => {
 	return Array(length).fill("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").map(x => x[Math.floor(Math.random() * x.length)]).join('');
+};
+
+
+const checkIfClipboardIsImage = (): Promise<void> => {
+	return new Promise<void>((resolve, reject) => {
+		try {
+			const ps = spawn('osascript', ['-e', 'clipboard info']);
+
+			ps.stdout.on('data', (raw: Uint8Array) => {
+				const data = raw.toString();
+				if (data.includes("picture")) {
+					resolve();
+				} else {
+					reject("clipboard is not an image");
+				}
+			});
+		} catch (err) {
+			reject(`subprocess error: ${err}`);
+		}
+	});
 };
 
 
@@ -13,12 +38,17 @@ const promptForFilename = (defaultName: string): Promise<string> => {
 			prompt: 'Please specify the filename of the image.',
 			value: defaultName
 		}).then((value?: string) => {
-			if (!value) {
-				reject("you entered an empty filename");
+			if (value === undefined) {
+				reject(null);	// canceled
 				return;
 			}
 
-			const filename = value.trim();
+			let filename = value.trim().replace(' ', '\\ ');
+
+			if (!filename) {
+				reject("you entered an empty filename");
+				return;
+			}
 
 			// It looks like MacOS only disallows the path separator character in a filename, but we should switch to
 			// regex if we want to prohibit more characters.
@@ -27,8 +57,29 @@ const promptForFilename = (defaultName: string): Promise<string> => {
 				return;
 			}
 
+			if(!filename.endsWith(".png")) {
+				filename += ".png";
+			}
+
 			resolve(filename);
 		});
+	});
+};
+
+
+const getAbsPath = (rootPath: string, folder: string, filename: string, failIfExists: boolean = true): Promise<string> => {
+	return new Promise<string>((resolve, reject) => {
+		const imgPath = path.join(rootPath, folder, filename);
+
+		// Make sure this file does not exist.
+		if (failIfExists && existsSync(imgPath)) {
+			// vscode.window.showInformationMessage(`${filename} already exists.`, "Enter new name", "Replace", "Cancel")
+			// 	.then(value => { });
+			reject("duplcate filename");
+			return;
+		}
+	
+		resolve(imgPath);
 	});
 };
 
@@ -48,7 +99,7 @@ const pasteImage = (folder: string, defaultName: string) => {
 	}
 
 	const rootPath = vscode.workspace.workspaceFolders[0].uri.path;
-	console.debug(`rootPath=${rootPath}`);
+	// console.debug(`rootPath=${rootPath}`);
 
 	const textEditor = vscode.window.activeTextEditor;
 	if (!textEditor) {
@@ -63,8 +114,6 @@ const pasteImage = (folder: string, defaultName: string) => {
 
 	// Get the file URI
 	const uri = textEditor.document.fileName;
-	const dirname = path.dirname(uri);
-	// const relPath = path.relative(dirname, path.join(rootPath, "images", "img_test.png"));
 
 	// If file does not seem to be markdown, ask the user if they want to continue.
 	new Promise((resolve, reject) => {
@@ -82,30 +131,26 @@ const pasteImage = (folder: string, defaultName: string) => {
 
 		resolve(null);
 	})
+
+	// Make sure we are working with an image first.
+	.then(() => checkIfClipboardIsImage())
+
 	// Great, now ask for a filename.
-	.then(() => {
-		return promptForFilename(defaultName);
+	.then(() =>  promptForFilename(defaultName))
+
+	// Generate the absolute path for the image.
+	.then(filename => getAbsPath(rootPath, folder, filename, true))
+
+	.then((imgPath) => {
+
+		vscode.window.showInformationMessage(imgPath);
+
+		// const dirname = path.dirname(uri);
+		// const relPath = path.relative(dirname, path.join(rootPath, "images", "img_test.png"));
 	})
 
-	.then(filename => {
-		const imgPath = path.join(rootPath, folder, filename);
-
-		// Make sure this file does not exist.
-		const exists = true;
-
-		if (exists) {
-			// vscode.window.showInformationMessage(`${filename} already exists.`, "Enter new name", "Replace", "Cancel")
-			// 	.then(value => { });
-			throw new Error("duplcate filename");
-		}
-
-		// Pass it on.
-		return filename;
-	})
-
-	.then((filename) => {
-		vscode.window.showInformationMessage(filename);
-	})
+	// Write markdown.
+	.then(() => {})
 
 	// Uh oh, something went wrong.
 	.catch(reason => {
