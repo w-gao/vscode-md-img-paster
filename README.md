@@ -2,7 +2,7 @@
 
 A vscode extension to create an image from the clipboard and import it into a markdown file.
 
-NOTE: this only works on **MacOS** for now.
+NOTE: This is for personal use, and it only works on **Mac OS**.
 
 
 ## Usage
@@ -10,9 +10,9 @@ NOTE: this only works on **MacOS** for now.
 This extension is triggered by hitting: `cmd + alt + V`.
 
 
-## Credits
+## Acknowledgement
 
-Inspired by: https://github.com/mushanshitiancai/vscode-paste-image
+- Inspired by: https://github.com/mushanshitiancai/vscode-paste-image
 
 
 ## License

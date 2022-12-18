@@ -131,13 +131,12 @@ const saveClipboardToFile = (absPath: string): Promise<string> => {
 
 
 const writeImageMarkdown = (editor: vscode.TextEditor, relPath: string): Promise<void> => {
-	const text  = `![image](${encodeURIComponent(relPath)})\n`;
+	const text  = `![image](${relPath.replaceAll(' ', '%20')})\n`;
 
 	return new Promise<void>((resolve, reject) => {
 		editor.edit(edit => {
 			let current = editor.selection;
 			edit.insert(current.start, text);
-
 		}).then(() => resolve());
 	});
 };
