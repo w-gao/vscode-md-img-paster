@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { spawn } from 'child_process';
 
 
@@ -9,6 +9,14 @@ import { spawn } from 'child_process';
  */
 const generateRandomString = (length: number): string => {
 	return Array(length).fill("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").map(x => x[Math.floor(Math.random() * x.length)]).join('');
+};
+
+
+/**
+ * Get a nicely formatted date time string like: "12-18-2022 1:25:06 PM".
+ */
+const getPrettyTime = (): string => {
+	return new Date().toLocaleString("en-US").replaceAll(',', '').replaceAll('/', '-');
 };
 
 
@@ -25,6 +33,9 @@ const checkIfClipboardIsImage = (): Promise<void> => {
 					reject("clipboard is not an image");
 				}
 			});
+
+			ps.stderr.on('data', data => reject(`stderr: ${data}`));
+			ps.on('error', err => reject(`subprocess error: ${err}`));
 		} catch (err) {
 			reject(`subprocess error: ${err}`);
 		}
@@ -43,17 +54,16 @@ const promptForFilename = (defaultName: string): Promise<string> => {
 				return;
 			}
 
-			let filename = value.trim().replace(' ', '\\ ');
+			let filename = value.trim();  // .replaceAll(' ', '\\ ');
 
 			if (!filename) {
 				reject("you entered an empty filename");
 				return;
 			}
 
-			// It looks like MacOS only disallows the path separator character in a filename, but we should switch to
-			// regex if we want to prohibit more characters.
-			if (filename.indexOf("/") >= 0) {
-				reject("invalid filename (cannot contain \"/\")");
+			// Let's prevent access to parent directories for now.
+			if (filename.indexOf("..") >= 0) {
+				reject("invalid filename (cannot contain \"..\")");
 				return;
 			}
 
@@ -71,7 +81,13 @@ const getAbsPath = (rootPath: string, folder: string, filename: string, failIfEx
 	return new Promise<string>((resolve, reject) => {
 		const imgPath = path.join(rootPath, folder, filename);
 
-		// Make sure this file does not exist.
+		// Make sure the parent directory exists. Note that filename is the user input, and could contain sub-folders.
+		const dirPath = path.dirname(imgPath);
+		if (!existsSync(dirPath)){
+			mkdirSync(dirPath, { recursive: true });
+		}
+
+		// Make sure the image file does not already exist.
 		if (failIfExists && existsSync(imgPath)) {
 			// vscode.window.showInformationMessage(`${filename} already exists.`, "Enter new name", "Replace", "Cancel")
 			// 	.then(value => { });
@@ -80,6 +96,49 @@ const getAbsPath = (rootPath: string, folder: string, filename: string, failIfEx
 		}
 	
 		resolve(imgPath);
+	});
+};
+
+
+const saveClipboardToFile = (absPath: string): Promise<string> => {
+	return new Promise<string>((resolve, reject) => {
+		try {
+			const dirname = path.dirname(absPath);
+			const filename = path.basename(absPath);
+			const ps = spawn('osascript', ['-e', `tell application "System Events" to write (the clipboard as «class PNGf») to (make new file at folder "${dirname}" with properties {name:"${filename}"})`]);
+
+			ps.on('close', code => {
+				if (code !== 0) {
+					reject(`recieved unexpected exit code: ${code}`);
+					return;
+				}
+
+				resolve(absPath);
+			});
+
+			ps.stderr.on('data', (data: Uint8Array) => {
+				if (data.toString().includes("error")) {
+					reject(data);
+				}
+			});
+
+			ps.on('error', err => reject(`subprocess error: ${err}`));
+		} catch (err) {
+			reject(`subprocess error: ${err}`);
+		}
+	});
+};
+
+
+const writeImageMarkdown = (editor: vscode.TextEditor, relPath: string): Promise<void> => {
+	const text  = `![image](${encodeURIComponent(relPath)})\n`;
+
+	return new Promise<void>((resolve, reject) => {
+		editor.edit(edit => {
+			let current = editor.selection;
+			edit.insert(current.start, text);
+
+		}).then(() => resolve());
 	});
 };
 
@@ -142,15 +201,16 @@ const pasteImage = (folder: string, defaultName: string) => {
 	.then(filename => getAbsPath(rootPath, folder, filename, true))
 
 	.then((imgPath) => {
-
-		vscode.window.showInformationMessage(imgPath);
-
-		// const dirname = path.dirname(uri);
-		// const relPath = path.relative(dirname, path.join(rootPath, "images", "img_test.png"));
+		vscode.window.showInformationMessage(`Saving file to ${imgPath}...`);
+		return saveClipboardToFile(imgPath);
 	})
 
 	// Write markdown.
-	.then(() => {})
+	.then((imgPath) => {
+		const dirname = path.dirname(uri);
+		const relPath = path.relative(dirname, imgPath);
+		return writeImageMarkdown(textEditor, relPath);
+	})
 
 	// Uh oh, something went wrong.
 	.catch(reason => {
@@ -173,7 +233,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		pasteImage("images", `img_${generateRandomString(6)}.png`);
+		pasteImage("images", `img_${getPrettyTime()}.png`);
 	});
 
 	context.subscriptions.push(disposable);
