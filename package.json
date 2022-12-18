@@ -10,14 +10,21 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:vscode-md-img-paster.helloWorld"
+    "onCommand:vscode-md-img-paster.pasteImg"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "vscode-md-img-paster.helloWorld",
-        "title": "Hello World"
+        "command": "vscode-md-img-paster.pasteImg",
+        "title": "Paste clipboard image into Markdown"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vscode-md-img-paster.pasteImg",
+        "key": "cmd+alt+v",
+        "when": "editorLangId == markdown && editorFocus"
       }
     ]
   },
