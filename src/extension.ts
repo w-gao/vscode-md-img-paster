@@ -34,7 +34,10 @@ const checkIfClipboardIsImage = (): Promise<void> => {
 				}
 			});
 
-			ps.stderr.on('data', data => reject(`stderr: ${data}`));
+			ps.stderr.on('data', data => {
+				console.debug(`stderr: ${data}`);
+			});
+
 			ps.on('error', err => reject(`subprocess error: ${err}`));
 		} catch (err) {
 			reject(`subprocess error: ${err}`);
@@ -54,7 +57,7 @@ const promptForFilename = (defaultName: string): Promise<string> => {
 				return;
 			}
 
-			let filename = value.trim();  // .replaceAll(' ', '\\ ');
+			let filename = value.trim();
 
 			if (!filename) {
 				reject("you entered an empty filename");
@@ -136,7 +139,13 @@ const writeImageMarkdown = (editor: vscode.TextEditor, relPath: string): Promise
 	return new Promise<void>((resolve, reject) => {
 		editor.edit(edit => {
 			let current = editor.selection;
-			edit.insert(current.start, text);
+			if (current.isEmpty) {
+				edit.insert(current.start, text);
+			} else {
+				// Replace selection.
+				edit.replace(current, text);
+			}
+
 		}).then(() => resolve());
 	});
 };
@@ -213,9 +222,13 @@ const pasteImage = (folder: string, defaultName: string) => {
 
 	// Uh oh, something went wrong.
 	.catch(reason => {
+		if (reason instanceof Error) {
+			reason = reason.message;
+		}
+
 		if (reason) {
-			if (reason instanceof Error) { reason = reason.message; }
 			vscode.window.showErrorMessage(`Failed to paste image: ${reason}.`);
+			console.warn(reason);
 		}
 	});
 
