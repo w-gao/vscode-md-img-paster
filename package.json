@@ -7,6 +7,10 @@
     "name": "William Gao",
     "email": "wlgao@ucsc.edu"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/w-gao/vscode-md-img-paster.git"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
