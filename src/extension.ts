@@ -5,14 +5,6 @@ import { spawn } from 'child_process';
 
 
 /**
- * Get a somewhat random string with a fixed length.
- */
-const generateRandomString = (length: number): string => {
-    return Array(length).fill("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").map(x => x[Math.floor(Math.random() * x.length)]).join('');
-};
-
-
-/**
  * Get a nicely formatted date time string like: "12-18-2022 1:25:06 PM".
  */
 const getPrettyTime = (): string => {
@@ -22,26 +14,21 @@ const getPrettyTime = (): string => {
 
 const checkIfClipboardIsImage = (): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
-        try {
-            const ps = spawn('osascript', ['-e', 'clipboard info']);
+        const ps = spawn('osascript', ['-e', 'clipboard info']);
 
-            ps.stdout.on('data', (raw: Uint8Array) => {
-                const data = raw.toString();
-                if (data.includes("picture")) {
-                    resolve();
-                } else {
-                    reject("clipboard is not an image");
-                }
-            });
+        ps.stdout.on('data', (data: Uint8Array) => {
+            if (data.toString().includes("picture")) {
+                resolve();
+            } else {
+                reject("clipboard is not an image");
+            }
+        });
 
-            ps.stderr.on('data', data => {
-                console.debug(`stderr: ${data}`);
-            });
+        ps.stderr.on('data', data => {
+            console.debug(`stderr: ${data}`);
+        });
 
-            ps.on('error', err => reject(`subprocess error: ${err}`));
-        } catch (err) {
-            reject(`subprocess error: ${err}`);
-        }
+        ps.on('error', err => reject(`subprocess error: ${err}`));
     });
 };
 
@@ -94,7 +81,7 @@ const getAbsPath = (rootPath: string, folder: string, filename: string, failIfEx
         if (failIfExists && existsSync(imgPath)) {
             // vscode.window.showInformationMessage(`${filename} already exists.`, "Enter new name", "Replace", "Cancel")
             // 	.then(value => { });
-            reject("duplcate filename");
+            reject("duplicate filename");
             return;
         }
     
@@ -105,30 +92,26 @@ const getAbsPath = (rootPath: string, folder: string, filename: string, failIfEx
 
 const saveClipboardToFile = (absPath: string): Promise<string> => {
     return new Promise<string>((resolve, reject) => {
-        try {
-            const dirname = path.dirname(absPath);
-            const filename = path.basename(absPath);
-            const ps = spawn('osascript', ['-e', `tell application "System Events" to write (the clipboard as «class PNGf») to (make new file at folder "${dirname}" with properties {name:"${filename}"})`]);
+        const dirname = path.dirname(absPath);
+        const filename = path.basename(absPath);
+        const ps = spawn('osascript', ['-e', `tell application "System Events" to write (the clipboard as «class PNGf») to (make new file at folder "${dirname}" with properties {name:"${filename}"})`]);
 
-            ps.on('close', code => {
-                if (code !== 0) {
-                    reject(`recieved unexpected exit code: ${code}`);
-                    return;
-                }
+        ps.on('close', code => {
+            if (code !== 0) {
+                reject(`recieved unexpected exit code: ${code}`);
+                return;
+            }
 
-                resolve(absPath);
-            });
+            resolve(absPath);
+        });
 
-            ps.stderr.on('data', (data: Uint8Array) => {
-                if (data.toString().includes("error")) {
-                    reject(data);
-                }
-            });
+        ps.stderr.on('data', (data: Uint8Array) => {
+            if (data.toString().includes("error")) {
+                reject(data);
+            }
+        });
 
-            ps.on('error', err => reject(`subprocess error: ${err}`));
-        } catch (err) {
-            reject(`subprocess error: ${err}`);
-        }
+        ps.on('error', err => reject(`subprocess error: ${err}`));
     });
 };
 
@@ -203,7 +186,7 @@ const pasteImage = (folder: string, defaultName: string) => {
     .then(() => checkIfClipboardIsImage())
 
     // Great, now ask for a filename.
-    .then(() =>  promptForFilename(defaultName))
+    .then(() => promptForFilename(defaultName))
 
     // Generate the absolute path for the image.
     .then(filename => getAbsPath(rootPath, folder, filename, true))
@@ -245,7 +228,14 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        pasteImage("images", `img_${getPrettyTime()}.png`);
+        let defaultName = `img_${getPrettyTime()}.png`;
+
+        // Use selection text as the default file name.
+        if (vscode.window.activeTextEditor?.selection.isEmpty === false) {
+            defaultName = `${vscode.window.activeTextEditor.document.getText(vscode.window.activeTextEditor.selection)}.png`; 
+        }
+
+        pasteImage("images", defaultName);
     });
 
     context.subscriptions.push(disposable);
