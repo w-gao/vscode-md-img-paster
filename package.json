@@ -2,7 +2,7 @@
   "name": "vscode-md-img-paster",
   "displayName": "Markdown Image Paster",
   "description": "Quickly paste an image from the clipboard to a markdown file.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "wlgao",
   "author": {
     "name": "William Gao",
