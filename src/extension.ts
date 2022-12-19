@@ -183,12 +183,12 @@ const pasteImage = (folder: string, defaultName: string) => {
     const uri = textEditor.document.fileName;
 
     // If file does not seem to be markdown, ask the user if they want to continue.
-    new Promise((resolve, reject) => {
+    new Promise<void>((resolve, reject) => {
         if (!(uri.endsWith(".markdown") || uri.endsWith(".md"))) {
             vscode.window.showInformationMessage("The file extension does not end in .md or .markdown. Do you want to continue?", "Continue", "Cancel")
                 .then((value) => {
                     if (value === "Continue") {
-                        resolve(null);
+                        resolve();
                         return;
                     }
                     reject(null);  // no need to log error
@@ -196,7 +196,7 @@ const pasteImage = (folder: string, defaultName: string) => {
             return;
         }
 
-        resolve(null);
+        resolve();
     })
 
     // Make sure we are working with an image first.
@@ -208,6 +208,7 @@ const pasteImage = (folder: string, defaultName: string) => {
     // Generate the absolute path for the image.
     .then(filename => getAbsPath(rootPath, folder, filename, true))
 
+    // Save clipboard to a file.
     .then((imgPath) => {
         vscode.window.showInformationMessage(`Saving file to ${imgPath}...`);
         return saveClipboardToFile(imgPath);
@@ -215,8 +216,7 @@ const pasteImage = (folder: string, defaultName: string) => {
 
     // Write markdown.
     .then((imgPath) => {
-        const dirname = path.dirname(uri);
-        const relPath = path.relative(dirname, imgPath);
+        const relPath = path.relative(path.dirname(uri), imgPath);
         return writeImageMarkdown(textEditor, relPath);
     })
 
