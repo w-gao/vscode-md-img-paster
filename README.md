@@ -1,20 +1,20 @@
 # vscode-md-img-paster
 
-A vscode extension to create an image from the clipboard and import it into a markdown file.
+A Visual Studio Code extension to quickly paste images from the clipboard to a markdown file.
 
-NOTE: This is for personal use, and it only works on **Mac OS**.
+NOTE: This is created for my personal use, and it only works on **Mac OS**. I may add support for other platforms in the future.
 
 
 ## Usage
 
-This extension is triggered by hitting: `cmd + alt + V`.
+- When you are editing a markdown file, you can use: `cmd + alt + V` to paste an image from the clipboard.
 
 
 ## Acknowledgement
 
-- Inspired by: https://github.com/mushanshitiancai/vscode-paste-image
+This extension is inspired by: https://marketplace.visualstudio.com/items?itemName=mushan.vscode-paste-image.
 
 
 ## License
 
-MIT &copy; 2022 William Gao
+MIT License, Copyright &copy; 2022 William Gao
